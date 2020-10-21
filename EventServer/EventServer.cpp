@@ -18,15 +18,20 @@
 //TODO: Boy, having a socket variable for each client will get tiring fast.
 // It would be nice to have a nicer system for this...
 SOCKET ListenSocket, AcceptSocket;
+SOCKET sockets[64];
 WSAEVENT ListenEvent, AcceptEvent;
-int eventCount = 2;
+WSAEVENT events[64];
+
+//TODO add a 2D vector of sockest & events
+
+int eventCount = 0;
 int clientCount = 0;
 
 //Structure to hold the result from WSAEnumNetworkEvents
 WSANETWORKEVENTS NetworkEvents;
 
 //Prototypes
-void CleanupSocket();
+void CleanupSocket(int index);
 
 int main()
 {
@@ -45,6 +50,8 @@ int main()
 	if (ListenSocket == INVALID_SOCKET) {
 		die("socket failed");
 	}
+	sockets[eventCount] = ListenSocket;
+
 
 	// Bind the server socket to its address.
 	if (bind(ListenSocket, (SOCKADDR*)&InetAddr, sizeof(InetAddr)) != 0) {
@@ -59,6 +66,7 @@ int main()
 	//Assosciate this event with the socket types we're interested in
 	//In this case, on the server, we're interested in Accepts and Closes
 	WSAEventSelect(ListenSocket, ListenEvent, FD_ACCEPT | FD_CLOSE);
+	events[eventCount] = ListenEvent;
 
 	//Start listening for connection requests on the socket
 	if (listen(ListenSocket, 1) == SOCKET_ERROR) {
@@ -79,75 +87,81 @@ int main()
 		//Here we check for events on the ListenEvent		
 		DWORD returnVal;
 
-		if (clientCount < 1) {
-			returnVal = WSAWaitForMultipleEvents(1, &ListenEvent, false, 0, false);
+			//for only 1 client use this
+			//returnVal = WSAWaitForMultipleEvents(1, &ListenEvent, true, 0, false);
+		
+			returnVal = WSAWaitForMultipleEvents(eventCount, events, false, 0, false);
 
-			if ((returnVal != WSA_WAIT_TIMEOUT) && (returnVal != WSA_WAIT_FAILED)) {
-				eventIndex = returnVal - WSA_WAIT_EVENT_0; //In practice, eventIndex will equal returnVal, but this is here for compatability
+		if ((returnVal != WSA_WAIT_TIMEOUT) && (returnVal != WSA_WAIT_FAILED)) {
+			eventIndex = returnVal - WSA_WAIT_EVENT_0; //In practice, eventIndex will equal returnVal, but this is here for compatability
 
-				if (WSAEnumNetworkEvents(ListenSocket, ListenEvent, &NetworkEvents) == SOCKET_ERROR) {
-					die("Retrieving event information failed");
+			if (WSAEnumNetworkEvents(sockets[eventIndex], events[eventIndex], &NetworkEvents) == SOCKET_ERROR) {
+				die("Retrieving event information failed");
+			}
+			if (NetworkEvents.lNetworkEvents & FD_ACCEPT)
+			{
+				if (NetworkEvents.iErrorCode[FD_ACCEPT_BIT] != 0) {
+					printf("FD_ACCEPT failed with error %d\n", NetworkEvents.iErrorCode[FD_ACCEPT_BIT]);
+					break;
 				}
-				if (NetworkEvents.lNetworkEvents & FD_ACCEPT)
+				// Accept a new connection, and add it to the socket and event lists
+				AcceptSocket = accept(sockets[eventIndex], NULL, NULL);
+				AcceptEvent = WSACreateEvent();
+				//TODO: It'd be great if we could wait for a Read or Write event too...
+				WSAEventSelect(AcceptSocket, AcceptEvent,FD_READ | FD_WRITE | FD_CLOSE);
+
+				//TODO check for errors on accept
+
+				sockets[eventCount] = AcceptSocket;
+				events[eventCount] = AcceptEvent;
+				eventCount++;			
+				clientCount++;
+
+				printf("Socket %d connected\n", AcceptSocket);
+			}
+			if (NetworkEvents.lNetworkEvents & FD_CLOSE)
+			{
+				//We ignore the error if the client just force quit
+				if (NetworkEvents.iErrorCode[FD_CLOSE_BIT] != 0 && NetworkEvents.iErrorCode[FD_CLOSE_BIT] != 10053)
 				{
-					if (NetworkEvents.iErrorCode[FD_ACCEPT_BIT] != 0) {
-						printf("FD_ACCEPT failed with error %d\n", NetworkEvents.iErrorCode[FD_ACCEPT_BIT]);
-						break;
-					}
-					// Accept a new connection, and add it to the socket and event lists
-					AcceptSocket = accept(ListenSocket, NULL, NULL);
-					AcceptEvent = WSACreateEvent();
-
-					//TODO: It'd be great if we could wait for a Read or Write event too...
-					WSAEventSelect(AcceptSocket, AcceptEvent, FD_CLOSE);
-					clientCount++;
-
-					printf("Socket %d connected\n", AcceptSocket);
+					printf("FD_CLOSE failed with error %d\n", NetworkEvents.iErrorCode[FD_CLOSE_BIT]);
+					break;
 				}
+				CleanupSocket(eventIndex);
 			}
-			else if (returnVal == WSA_WAIT_TIMEOUT) {
-				//All good, we just have no activity
+
+			if (NetworkEvents.lNetworkEvents & FD_READ)
+			{
+				//read something
 			}
-			else if (returnVal == WSA_WAIT_FAILED) {
-				die("WSAWaitForMultipleEvents failed!");
+
+			//warning FD_WRITE responds as soon as it can write something
+			//come up with a system to check if it SHOULD write something
+			if (NetworkEvents.lNetworkEvents & FD_WRITE)
+			{
+				//write something
 			}
 		}
-		if (clientCount > 0) {
-			returnVal = WSAWaitForMultipleEvents(1, &AcceptEvent, false, 0, false);
-			if ((returnVal != WSA_WAIT_TIMEOUT) && (returnVal != WSA_WAIT_FAILED)) {
-				eventIndex = returnVal - WSA_WAIT_EVENT_0; //In practice, eventIndex will equal returnVal, but this is here for compatability
-
-				if (WSAEnumNetworkEvents(AcceptSocket, AcceptEvent, &NetworkEvents) == SOCKET_ERROR) {
-					die("Retrieving event information failed");
-				}
-				if (NetworkEvents.lNetworkEvents & FD_CLOSE)
-				{
-					//We ignore the error if the client just force quit
-					if (NetworkEvents.iErrorCode[FD_CLOSE_BIT] != 0 && NetworkEvents.iErrorCode[FD_CLOSE_BIT] != 10053)
-					{
-						printf("FD_CLOSE failed with error %d\n", NetworkEvents.iErrorCode[FD_CLOSE_BIT]);
-						break;
-					}
-					CleanupSocket();
-				}
-			}
-			else if (returnVal == WSA_WAIT_TIMEOUT) {
-				//All good, we just have no activity
-			}
-			else if (returnVal == WSA_WAIT_FAILED) {
-				die("WSAWaitForMultipleEvents failed!");
-			}
+		else if (returnVal == WSA_WAIT_TIMEOUT) {
+			//All good, we just have no activity
 		}
+		else if (returnVal == WSA_WAIT_FAILED) {
+			die("WSAWaitForMultipleEvents failed!");
+		}
+			
+		
 	}
 }
 
-void CleanupSocket() {
+void CleanupSocket(int index) {
 
-	if (closesocket(AcceptSocket) != SOCKET_ERROR) {
+	if (closesocket(sockets[index]) != SOCKET_ERROR) {
 		printf("Successfully closed socket %d\n", AcceptSocket);
 	}
-	if (WSACloseEvent(AcceptEvent) == false) {
+	if (WSACloseEvent(events[index]) == false) {
 		die("WSACloseEvent() failed");
 	}
 	clientCount = 0;
+
+	//TODO tidy up arrays, move everyone up 1 position to fill in dead space
 }

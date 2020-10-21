@@ -1,0 +1,2 @@
+C:\Users\User\Documents\C++\Networking\Networking-Sockets\client\Debug\client.exe
+C:\Users\User\Documents\C++\Networking\Networking-Sockets\client\Debug\client.pdb
