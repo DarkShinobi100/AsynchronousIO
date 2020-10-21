@@ -1,0 +1,13 @@
+﻿  EventServer.cpp
+C:\Users\Mini\source\repos\CMP303\Events\EventServer - Copy\EventServer\EventServer.cpp(106,13): warning C4477: 'printf' : format string '%d' requires an argument of type 'int', but variadic argument 1 has type 'SOCKET'
+C:\Users\Mini\source\repos\CMP303\Events\EventServer - Copy\EventServer\EventServer.cpp(106,13): message : consider using '%lld' in the format string
+C:\Users\Mini\source\repos\CMP303\Events\EventServer - Copy\EventServer\EventServer.cpp(106,13): message : consider using '%Id' in the format string
+C:\Users\Mini\source\repos\CMP303\Events\EventServer - Copy\EventServer\EventServer.cpp(106,13): message : consider using '%I64d' in the format string
+C:\Users\Mini\source\repos\CMP303\Events\EventServer - Copy\EventServer\EventServer.cpp(35,7): warning C4101: 'Buffer': unreferenced local variable
+C:\Users\Mini\source\repos\CMP303\Events\EventServer - Copy\EventServer\EventServer.cpp(150,10): warning C4477: 'printf' : format string '%d' requires an argument of type 'int', but variadic argument 1 has type 'SOCKET'
+C:\Users\Mini\source\repos\CMP303\Events\EventServer - Copy\EventServer\EventServer.cpp(150,10): message : consider using '%lld' in the format string
+C:\Users\Mini\source\repos\CMP303\Events\EventServer - Copy\EventServer\EventServer.cpp(150,10): message : consider using '%Id' in the format string
+C:\Users\Mini\source\repos\CMP303\Events\EventServer - Copy\EventServer\EventServer.cpp(150,10): message : consider using '%I64d' in the format string
+  NetUtility.cpp
+  Generating Code...
+  EventServer.vcxproj -> C:\Users\Mini\source\repos\CMP303\Events\EventServer - Copy\x64\Debug\EventServer.exe
